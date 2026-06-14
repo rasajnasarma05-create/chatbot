@@ -2,3 +2,4 @@ streamlit
 google-genai
 pypdf
 pillow
+streamlit-mic-recorder
