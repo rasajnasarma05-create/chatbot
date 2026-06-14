@@ -17,3 +17,14 @@ A simple Streamlit app that shows how to build a chatbot using OpenAI's GPT-3.5.
    ```
    $ streamlit run streamlit_app.py
    ```
+# LexSphere AI
+
+AI-powered legal education assistant for Indian law students.
+
+Features:
+- BNSS Assistant
+- BNS Assistant
+- BSA Assistant
+- Scenario Analysis
+- Exam Mode
+- Research Mode
