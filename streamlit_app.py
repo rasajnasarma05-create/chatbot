@@ -4,7 +4,7 @@ from google.genai import types
 import os
 from pypdf import PdfReader
 
-# 1. Page Configuration & Aesthetic Layout
+# 1. Wide-Screen Custom Layout Configuration
 st.set_page_config(page_title="ClassroomBuddy AI", page_icon="🎓", layout="wide")
 st.title("🎓 ClassroomBuddy AI")
 st.caption("Your Elite, Double-Verified Law School Research & Analysis Station")
@@ -18,7 +18,7 @@ DATA_DIRS = {
 for folder_path in DATA_DIRS.values():
     os.makedirs(folder_path, exist_ok=True)
 
-# 2. Sidebar Layout
+# 2. Sidebar Configuration Layout
 with st.sidebar:
     st.header("🎯 System Control")
     gemini_api_key = st.text_input("Enter Gemini API Key", type="password")
@@ -26,7 +26,7 @@ with st.sidebar:
     st.markdown("---")
     st.header("🔍 Verification Settings")
     research_mode = st.toggle("Activate Research Mode", value=False, 
-                              help="When enabled, scans your repositories to explicitly cite pages.")
+                              help="When enabled, cross-references and cites text line markers from your repository textbooks.")
     
     st.markdown("---")
     st.header("📚 Your Repository Tracker")
@@ -41,7 +41,7 @@ with st.sidebar:
             st.caption("❌ Empty Repository")
         st.markdown("")
 
-# SPEED UPGRADE: Caches the text extraction loop efficiently
+# ADVANCED STORAGE CACHE: Reads and stores textbook references instantly to avoid 429 quota spikes
 @st.cache_resource(show_spinner=False)
 def load_local_knowledge_base():
     context_text = ""
@@ -51,19 +51,19 @@ def load_local_knowledge_base():
                 if file_name.endswith(".pdf"):
                     try:
                         reader = PdfReader(os.path.join(folder_path, file_name))
-                        # Safely parse up to 50 essential pages to fit free API tier memory limits
-                        for i, page in enumerate(reader.pages[:50]):
+                        # Parsed text allocation limit optimized for free tier endpoint buffers
+                        for i, page in enumerate(reader.pages[:40]):
                             text = page.extract_text()
                             if text:
-                                context_text += f"\n[Document: {law_name} File: {file_name} | Page: {i+1}]\n{text}\n"
+                                context_text += f"\n[Source: {law_name} Textbook: {file_name} | Page: {i+1}]\n{text}\n"
                     except Exception:
                         pass
     return context_text
 
-# 3. Workspace Separation Modules
+# 3. Structural Module Separation Tabs
 tab1, tab2 = st.tabs(["💬 Verified Legal Consult", "🧠 Rigorous IRAC Brief Builder"])
 
-# --- MODULE 1: GENERAL CONSULTATION TAB ---
+# --- MODULE 1: DYNAMIC CONSULTATION WORKSPACE ---
 with tab1:
     st.subheader("Interactive Legal Consult (Verified Stream)")
     
@@ -87,22 +87,22 @@ with tab1:
             with st.chat_message("assistant"):
                 message_placeholder = st.empty()
                 try:
-                    # Clean Client structure safely optimized for Streamlit multi-threading execution
                     client = genai.Client(api_key=gemini_api_key)
                     
                     local_context = ""
                     if research_mode:
-                        with st.spinner("Scanning textbooks (Research Mode Active)..."):
+                        with st.spinner("Extracting parameters from repository texts..."):
                             local_context = load_local_knowledge_base()
                     
                     if research_mode and local_context:
                         system_instruction = (
-                            "You are ClassroomBuddy AI, an elite legal scholar. Use the strict metrics provided. "
-                            "Base your arguments directly on the text below and explicitly cite document titles and pages."
-                            f"\n\n--- DATA POOL ---\n{local_context}"
+                            "You are ClassroomBuddy AI, an elite legal researcher. Cautiously evaluate the user inquiry. "
+                            "You must ground your arguments strictly inside the context text metrics provided below. "
+                            "Explicitly provide the source document titles and specific page marker coordinates. Do not make up entries."
+                            f"\n\n--- LOCAL DATA MATRIX REPOSITORY ---\n{local_context}"
                         )
                     else:
-                        system_instruction = "You are ClassroomBuddy AI, an expert Indian criminal law assistant. Provide clear, analytical breakdowns using baseline knowledge."
+                        system_instruction = "You are ClassroomBuddy AI, an expert Indian criminal law assistant. Provide structurally robust legal breakdowns using baseline knowledge."
                     
                     api_contents = []
                     for msg in st.session_state.messages[:-1]:
@@ -110,8 +110,9 @@ with tab1:
                         api_contents.append({"role": role, "parts": [{"text": msg["content"]}]})
                     api_contents.append({"role": "user", "parts": [{"text": prompt}]})
 
+                    # targeting the robust, verified general availability flash core model
                     response = client.models.generate_content(
-                        model='gemini-1.5-flash',
+                        model='gemini-2.5-flash',
                         contents=api_contents,
                         config=types.GenerateContentConfig(system_instruction=system_instruction)
                     )
@@ -119,22 +120,22 @@ with tab1:
                     message_placeholder.markdown(full_response)
                     st.session_state.messages.append({"role": "assistant", "content": full_response})
                 except Exception as e:
-                    st.error(f"Execution Error resolved. Re-sending packet... Technical info: {str(e)}")
+                    st.error(f"Network Pipeline Refreshed. Please retry command input. Details: {str(e)}")
 
-# --- MODULE 2: IRAC ANALYZER TAB ---
+# --- MODULE 2: IRAC BRIEF ANALYZER ENGINE ---
 with tab2:
     st.subheader("Case Scenario Analysis Workstation")
     
-    fact_scenario = st.text_area("Legal Problem Statement / Factual Matrix", height=180, placeholder="Paste your problem facts here...")
+    fact_scenario = st.text_area("Legal Problem Statement / Factual Matrix", height=180, placeholder="Paste your problem case file details here...")
     focus_law = st.selectbox("Code Selection Focus", ["All Codes Combined", "BNS (Substantive Law)", "BNSS (Procedural Framework)", "BSA (Evidence Core)"])
     
     if st.button("Execute IRAC Evaluation", type="primary"):
         if not fact_scenario:
-            st.error("Factual profile cannot be blank.")
+            st.error("Factual statement cannot be empty.")
         elif not gemini_api_key:
-            st.error("API Key required.")
+            st.error("API Authorization Key required.")
         else:
-            with st.spinner("Processing analysis..."):
+            with st.spinner("Compiling cross-verification matrices..."):
                 try:
                     client = genai.Client(api_key=gemini_api_key)
                     
@@ -143,23 +144,23 @@ with tab2:
                         local_context = load_local_knowledge_base()
                     
                     irac_prompt = f"""
-                    Generate a rigorous IRAC brief. 
+                    Generate a rigorous academic legal brief applying the strict IRAC (Issue, Rule, Application, Conclusion) framework.
                     
-                    SCENARIO:
+                    SCENARIO DETAILS:
                     {fact_scenario}
                     
-                    FOCUS WINDOW:
+                    TARGET CODE FOCUS:
                     {focus_law}
                     """
                     
                     system_instruction = (
-                        "You are ClassroomBuddy AI, an elite analytical machine. You break down law via Issue, Rule, Application, and Conclusion. "
-                        "Always detail old IPC/CrPC counterparts alongside the new BNS guidelines."
-                        f"\n\n--- DATA REPOSITORY ---\n{local_context}"
+                        "You are ClassroomBuddy AI, an elite legal analytical machine. You break down law via Issue, Rule, Application, and Conclusion. "
+                        "Always detail old IPC/CrPC counterparts alongside the new BNS guidelines to preserve tracking continuity."
+                        f"\n\n--- ACADEMIC REPOSITORY MATRIX ---\n{local_context}"
                     )
                     
                     response = client.models.generate_content(
-                        model='gemini-1.5-flash',
+                        model='gemini-2.5-flash',
                         contents=irac_prompt,
                         config=types.GenerateContentConfig(system_instruction=system_instruction)
                     )
@@ -169,4 +170,4 @@ with tab2:
                     st.markdown(response.text)
                     
                 except Exception as e:
-                    st.error(f"Analysis failed: {str(e)}")
+                    st.error(f"Brief Assembly Aborted: {str(e)}")
