@@ -25,8 +25,8 @@ with st.sidebar:
     
     st.markdown("---")
     st.header("🔍 Verification Settings")
-    research_mode = st.toggle("Activate Research Mode", value=True, 
-                              help="Forces the system to cross-verify all extracted textbook pages and explicitly cite sources before generating answers.")
+    research_mode = st.toggle("Activate Research Mode", value=False, 
+                              help="When enabled, scans your repositories to explicitly cite pages.")
     
     st.markdown("---")
     st.header("📚 Your Repository Tracker")
@@ -41,7 +41,7 @@ with st.sidebar:
             st.caption("❌ Empty Repository")
         st.markdown("")
 
-# SPEED UPGRADE: Cache textbook text in memory so it reads them ONLY ONCE, not on every message!
+# SPEED UPGRADE: Caches the text extraction loop efficiently
 @st.cache_resource(show_spinner=False)
 def load_local_knowledge_base():
     context_text = ""
@@ -51,17 +51,14 @@ def load_local_knowledge_base():
                 if file_name.endswith(".pdf"):
                     try:
                         reader = PdfReader(os.path.join(folder_path, file_name))
-                        # Limit text extraction safely to prioritize speed and quality context
-                        for i, page in enumerate(reader.pages[:150]):  # Focuses on core chapters to remain lightning fast
-                          text = page.extract_text()
-                          if text:
-                              context_text += f"\n[Document: {law_name} Source File: {file_name} | Page Ref: {i+1}]\n{text}\n"
+                        # Safely parse up to 60 essential pages to avoid hitting API rate limits
+                        for i, page in enumerate(reader.pages[:60]):
+                            text = page.extract_text()
+                            if text:
+                                context_text += f"\n[Document: {law_name} File: {file_name} | Page: {i+1}]\n{text}\n"
                     except Exception:
                         pass
     return context_text
-
-# Pre-load knowledge base into background cache memory safely
-local_context = load_local_knowledge_base()
 
 # 3. Workspace Separation Modules
 tab1, tab2 = st.tabs(["💬 Verified Legal Consult", "🧠 Rigorous IRAC Brief Builder"])
@@ -92,15 +89,20 @@ with tab1:
                 try:
                     client = genai.Client(api_key=gemini_api_key, http_options={'headers': {'Connection': 'close'}})
                     
+                    # Core Bug Fix: ONLY scan files if Research Mode is toggled to ON
+                    local_context = ""
+                    if research_mode:
+                        with st.spinner("Scanning textbooks (Research Mode Active)..."):
+                            local_context = load_local_knowledge_base()
+                    
                     if research_mode and local_context:
                         system_instruction = (
-                            "You are ClassroomBuddy AI, an elite legal scholar and researcher. "
-                            "You have strict verification metrics. Base your arguments directly on the provided context "
-                            "and explicitly quote the document name and page reference. Do not make up information."
-                            f"\n\n--- DOUBLE VERIFIED CONTEXT POOL ---\n{local_context}"
+                            "You are ClassroomBuddy AI, an elite legal scholar. Use the strict metrics provided. "
+                            "Base your arguments directly on the text below and explicitly cite document titles and pages."
+                            f"\n\n--- DATA POOL ---\n{local_context}"
                         )
                     else:
-                        system_instruction = "You are ClassroomBuddy AI, an expert Indian criminal law assistant. Provide clear, analytical breakdowns."
+                        system_instruction = "You are ClassroomBuddy AI, an expert Indian criminal law assistant. Provide clear, analytical breakdowns using baseline knowledge."
                     
                     api_contents = []
                     for msg in st.session_state.messages[:-1]:
@@ -108,8 +110,9 @@ with tab1:
                         api_contents.append({"role": role, "parts": [{"text": msg["content"]}]})
                     api_contents.append({"role": "user", "parts": [{"text": prompt}]})
 
+                    # Using gemini-1.5-flash handles high-volume token contexts without hitting rate caps
                     response = client.models.generate_content(
-                        model='gemini-2.5-flash',
+                        model='gemini-1.5-flash',
                         contents=api_contents,
                         config=types.GenerateContentConfig(system_instruction=system_instruction)
                     )
@@ -117,7 +120,7 @@ with tab1:
                     message_placeholder.markdown(full_response)
                     st.session_state.messages.append({"role": "assistant", "content": full_response})
                 except Exception as e:
-                    st.error(f"System Connection Restored. Please re-send message. Technical info: {str(e)}")
+                    st.error(f"Execution Error: {str(e)}")
 
 # --- MODULE 2: IRAC ANALYZER TAB ---
 with tab2:
@@ -132,12 +135,16 @@ with tab2:
         elif not gemini_api_key:
             st.error("API Key required.")
         else:
-            with st.spinner("Running resource verification pass..."):
+            with st.spinner("Processing analysis..."):
                 try:
                     client = genai.Client(api_key=gemini_api_key, http_options={'headers': {'Connection': 'close'}})
                     
+                    local_context = ""
+                    if research_mode:
+                        local_context = load_local_knowledge_base()
+                    
                     irac_prompt = f"""
-                    Generate a rigorous IRAC brief based on the matching legal rules found within the data repository.
+                    Generate a rigorous IRAC brief. 
                     
                     SCENARIO:
                     {fact_scenario}
@@ -148,19 +155,19 @@ with tab2:
                     
                     system_instruction = (
                         "You are ClassroomBuddy AI, an elite analytical machine. You break down law via Issue, Rule, Application, and Conclusion. "
-                        "Always detail old IPC/CrPC counterparts alongside the new BNS guidelines to show professional academic competence."
+                        "Always detail old IPC/CrPC counterparts alongside the new BNS guidelines."
                         f"\n\n--- DATA REPOSITORY ---\n{local_context}"
                     )
                     
                     response = client.models.generate_content(
-                        model='gemini-2.5-flash',
+                        model='gemini-1.5-flash',
                         contents=irac_prompt,
                         config=types.GenerateContentConfig(system_instruction=system_instruction)
                     )
                     
                     st.markdown("---")
-                    st.success("🔬 Analysis Successfully Verified and Evaluated!")
+                    st.success("🔬 Analysis Evaluated!")
                     st.markdown(response.text)
                     
                 except Exception as e:
-                    st.error(f"Analysis loop conflict: {str(e)}")
+                    st.error(f"Analysis failed: {str(e)}")
