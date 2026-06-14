@@ -54,7 +54,11 @@ except Exception:
 # 2. DYNAMIC REGISTRATION USER VERIFICATION GATE
 # ==========================================
 if "dynamic_user_db" not in st.session_state:
-    st.session_state.dynamic_user_db = {"akshaya": "law2029"}
+    st.session_state.dynamic_user_db = {
+        "akshaya": "law2029",
+        "megha": "gitam2026",
+        "rasajna": "buddy2026"
+    }
 if "active_user" not in st.session_state:
     st.session_state.active_user = None
 if "user_session_vault" not in st.session_state:
