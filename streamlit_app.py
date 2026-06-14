@@ -2,60 +2,19 @@ import streamlit as st
 from google import genai
 from google.genai import types
 import os
-import json
 from pypdf import PdfReader
 
-# ==========================================
-# 1. PREMIUM CUSTOM CSS THEMING (PURPLE & GOLD)
-# ==========================================
+# 1. Page Configuration & Aesthetic Layout (Clean Native Configuration)
 st.set_page_config(page_title="ClassroomBuddy AI", page_icon="🎓", layout="wide")
-
-st.markdown("""
-    <style>
-    /* Main App Background & Colors */
-    :root {
-        --primary-color: #4B0082; /* Royal Purple */
-        --secondary-color: #D4AF37; /* Academic Gold */
-    }
-    .stApp {
-        background-color: #FAFAFA;
-    }
-    /* Buttons and Highlights */
-    div.stButton > button:first-child {
-        background-color: #4B0082;
-        color: white;
-        border-radius: 8px;
-        border: 2px solid #D4AF37;
-        font-weight: bold;
-        transition: all 0.3s ease;
-    }
-    div.stButton > button:first-child:hover {
-        background-color: #6A0DAD;
-        border-color: #FFD700;
-        transform: scale(1.02);
-    }
-    /* Chat bubbles custom style */
-    .chat-card {
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    </style>
-""", unsafe_with_html=True)
-
 st.title("🎓 ClassroomBuddy AI")
 st.caption("The Invincible, Double-Verified Jurisprudence & Criminal Law Learning Matrix")
 
-# Directory setups
 DATA_DIRS = {"BNS": "data/bns", "BNSS": "data/BNSS", "BSA": "data/bsa"}
 FEEDBACK_FILE = "data/peer_feedback.txt"
 for folder_path in DATA_DIRS.values():
     os.makedirs(folder_path, exist_ok=True)
 
-# ==========================================
 # 2. STATE PERSISTENCE & HISTORY MANAGEMENT
-# ==========================================
 if "sessions" not in st.session_state:
     st.session_state.sessions = {"Default Session": []}
 if "current_session" not in st.session_state:
@@ -89,7 +48,7 @@ with st.sidebar:
     st.session_state.current_session = st.selectbox("Switch Active Thread", session_list, index=session_list.index(st.session_state.current_session))
     
     st.markdown("---")
-    st.header("📚 Repository Tracker")
+    st.header("📚 Your Repository Tracker")
     for law_name, folder_path in DATA_DIRS.items():
         files = os.listdir(folder_path) if os.path.exists(folder_path) else []
         if files:
@@ -108,9 +67,7 @@ with st.sidebar:
                 f.write(feedback_text + "\n---\n")
             st.success("Thank you! Feedback saved anonymously.")
 
-# ==========================================
 # 3. BACKGROUND REPOSITORY TEXT SCANNER ENGINE
-# ==========================================
 @st.cache_resource(show_spinner=False)
 def load_local_knowledge_base():
     context_text = ""
@@ -128,9 +85,7 @@ def load_local_knowledge_base():
                         pass
     return context_text
 
-# ==========================================
 # 4. APP INTERFACE MODULE NAVIGATION TABS
-# ==========================================
 tab1, tab2, tab3 = st.tabs(["💬 Jurisprudence & Consult Chat", "🧠 Rigorous IRAC Matrix Analyzer", "🎯 Repository Quiz Engine"])
 
 # --- MODULE 1: INTERACTIVE SOCRATIC CONSULT CHAT ---
@@ -180,12 +135,10 @@ with tab1:
                         f"--- LOCAL STUDENT TEXTBOOK POOL ---\n{local_context}"
                     )
 
-                    # Dynamic structural configuration based on Google Search Grounding selection settings
                     config_args = {"system_instruction": system_instruction}
                     if research_mode:
                         config_args["tools"] = [{"google_search": {}}]
 
-                    # Compile multi-modal inputs if a screenshot or image file is present
                     contents_payload = []
                     if uploaded_image:
                         import PIL.Image
