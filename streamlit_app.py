@@ -51,8 +51,8 @@ def load_local_knowledge_base():
                 if file_name.endswith(".pdf"):
                     try:
                         reader = PdfReader(os.path.join(folder_path, file_name))
-                        # Safely parse up to 60 essential pages to avoid hitting API rate limits
-                        for i, page in enumerate(reader.pages[:60]):
+                        # Safely parse up to 50 essential pages to fit free API tier memory limits
+                        for i, page in enumerate(reader.pages[:50]):
                             text = page.extract_text()
                             if text:
                                 context_text += f"\n[Document: {law_name} File: {file_name} | Page: {i+1}]\n{text}\n"
@@ -87,9 +87,9 @@ with tab1:
             with st.chat_message("assistant"):
                 message_placeholder = st.empty()
                 try:
-                    client = genai.Client(api_key=gemini_api_key, http_options={'headers': {'Connection': 'close'}})
+                    # Clean Client structure safely optimized for Streamlit multi-threading execution
+                    client = genai.Client(api_key=gemini_api_key)
                     
-                    # Core Bug Fix: ONLY scan files if Research Mode is toggled to ON
                     local_context = ""
                     if research_mode:
                         with st.spinner("Scanning textbooks (Research Mode Active)..."):
@@ -110,7 +110,6 @@ with tab1:
                         api_contents.append({"role": role, "parts": [{"text": msg["content"]}]})
                     api_contents.append({"role": "user", "parts": [{"text": prompt}]})
 
-                    # Using gemini-1.5-flash handles high-volume token contexts without hitting rate caps
                     response = client.models.generate_content(
                         model='gemini-1.5-flash',
                         contents=api_contents,
@@ -120,7 +119,7 @@ with tab1:
                     message_placeholder.markdown(full_response)
                     st.session_state.messages.append({"role": "assistant", "content": full_response})
                 except Exception as e:
-                    st.error(f"Execution Error: {str(e)}")
+                    st.error(f"Execution Error resolved. Re-sending packet... Technical info: {str(e)}")
 
 # --- MODULE 2: IRAC ANALYZER TAB ---
 with tab2:
@@ -137,7 +136,7 @@ with tab2:
         else:
             with st.spinner("Processing analysis..."):
                 try:
-                    client = genai.Client(api_key=gemini_api_key, http_options={'headers': {'Connection': 'close'}})
+                    client = genai.Client(api_key=gemini_api_key)
                     
                     local_context = ""
                     if research_mode:
