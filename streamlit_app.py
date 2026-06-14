@@ -56,7 +56,7 @@ st.markdown("""
         margin-bottom: 10px;
     }
     </style>
-""", unsafe_with_html=True)
+""", unsafe_allow_html=True) # Fixed the exact keyword initialization typo here
 
 st.title("🎓 ClassroomBuddy AI")
 st.caption("Your Elite, Double-Verified Jurisprudence & Criminal Law Learning Matrix")
@@ -152,7 +152,7 @@ with tab1:
     col1, col2, col3, col4 = st.columns(4)
     with col1: format_flow = st.checkbox("Flowchart / Logic Matrix Layout")
     with col2: format_analogies = st.checkbox("Analogies & Real-World Illustrations", value=True)
-    with col3: format_precedents = st.checkbox(" Landmark Precedent Analysis")
+    with col3: format_precedents = st.checkbox("Landmark Precedent Analysis")
     with col4: format_direct = st.checkbox("Direct Conceptual Answer Only")
     
     # Map thread tracking session lists
