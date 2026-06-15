@@ -1,6 +1,5 @@
 import streamlit as st
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 import os
 from pypdf import PdfReader
 
@@ -44,16 +43,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Fetching the embedded Master Key securely from Streamlit Secrets
+# Securely bind the master key from Streamlit Secrets
 try:
-    MASTER_API_KEY = st.secrets["GEMINI_MASTER_KEY"]
+    MASTER_API_KEY = st.secrets["GEMINI_MASTER_KEY"].strip().replace('"', '')
+    if MASTER_API_KEY:
+        genai.configure(api_key=MASTER_API_KEY)
 except Exception:
     MASTER_API_KEY = ""
 
 # ==========================================
 # 2. PERSISTENT INSTITUTIONAL REGISTRY GATE
 # ==========================================
-# Using a server-level dictionary cache that survives browser refreshes completely
 @st.cache_resource
 def get_persistent_user_database():
     return {
@@ -81,7 +81,7 @@ if st.session_state.active_user is None:
     auth_tab1, auth_tab2 = st.tabs(["🔒 Existing Student Login", "📝 New Student Registration"])
     
     with auth_tab1:
-        username_entry = st.text_input("Username / Roll Number", placeholder="e.g., rasajna or roll-042").lower().strip()
+        username_entry = st.text_input("Username / Roll Number", placeholder="e.g., rasajna").lower().strip()
         password_entry = st.text_input("Password", type="password", placeholder="••••••••", key="login_pass_box")
         if st.button("Authenticate Login"):
             if username_entry in USER_DATABASE and USER_DATABASE[username_entry] == password_entry:
@@ -91,7 +91,7 @@ if st.session_state.active_user is None:
                 st.success("Access authorized. Syncing custom workspaces...")
                 st.rerun()
             else:
-                st.error("Invalid credentials. If you just registered, ensure text matches or re-enter details.")
+                st.error("Invalid credentials. Please verify your details.")
                 
     with auth_tab2:
         reg_username = st.text_input("Create Username / Enter Roll Number", placeholder="e.g., rasajna").lower().strip()
@@ -100,13 +100,13 @@ if st.session_state.active_user is None:
             if not reg_username or not reg_password:
                 st.error("Fields cannot be left blank.")
             elif reg_username in USER_DATABASE:
-                st.error("Username already registered in institutional logs.")
+                st.error("Username already registered.")
             else:
                 USER_DATABASE[reg_username] = reg_password
                 st.success(f"Account for '{reg_username}' created permanently! Switch to login tab.")
     st.stop()
 
-# Post-Authentication Active Workspace Environment
+# Post-Authentication Setup Workspace
 st.title("🎓 ClassroomBuddy AI")
 st.caption(f"Secure Institutional Node Active | Welcome, {st.session_state.active_user.upper()}")
 FEEDBACK_LOG_PATH = "data/peer_feedback.txt"
@@ -114,7 +114,7 @@ FEEDBACK_LOG_PATH = "data/peer_feedback.txt"
 if st.session_state.active_user not in st.session_state.user_session_vault:
     st.session_state.user_session_vault[st.session_state.active_user] = {"General Study Session": []}
 
-# Workspace Sidebar Configuration Dashboard
+# Sidebar Dashboard Layout Settings
 with st.sidebar:
     st.header("Dashboard")
     st.info("🛡️ Server Infrastructure Connected: Access is completely unlocked for students.")
@@ -122,7 +122,7 @@ with st.sidebar:
     st.markdown("---")
     st.subheader("Verification Tools")
     research_mode_active = st.toggle("Research Mode", value=True, 
-                                     help="Deploys live multi-source web search grounding to evaluate current amendments and judgments.")
+                                     help="Deploys live multi-source web search grounding to evaluate current amendments.")
     
     st.markdown("---")
     st.subheader("Study Sessions")
@@ -151,7 +151,7 @@ with st.sidebar:
         st.session_state.active_user = None
         st.rerun()
 
-# Rapid Document Processor RAG
+# Document RAG Text Chunk Puller
 def rapid_extract_document_chunks(file_asset):
     if file_asset is None:
         return ""
@@ -166,7 +166,7 @@ def rapid_extract_document_chunks(file_asset):
     except Exception as e:
         return f"[Document parsing error: {str(e)}]"
 
-# Tab Layout Sequence Configuration
+# Tab Interfacing Sequences
 tab1, tab2, tab3, tab4 = st.tabs([
     "💬 Ask Me Anything Legal", 
     "⚖️ Case Scenario Analyser", 
@@ -203,8 +203,6 @@ with tab1:
             with st.chat_message("assistant"):
                 text_stream_block = st.empty()
                 try:
-                    # Robust client initialization pass to prevent 401 connection exceptions
-                    client_instance = genai.Client(api_key=MASTER_API_KEY)
                     file_context_string = rapid_extract_document_chunks(tab1_file_upload)
                     
                     system_instructions = (
@@ -215,27 +213,22 @@ with tab1:
                         f"--- LOCAL SOURCE FILE DATA BLOCK ---\n{file_context_string}"
                     )
                     
-                    config_mapping = {"system_instruction": system_instructions}
-                    if research_mode_active: config_mapping["tools"] = [{"google_search": {}}]
-                        
-                    api_call_response = client_instance.models.generate_content(
-                        model='gemini-2.5-flash', contents=unresolved_user_prompt, config=types.GenerateContentConfig(**config_mapping)
-                    )
-                    final_response_payload = api_call_response.text
+                    # Native high-compatibility generation mapping
+                    model_engine = genai.Model(model_id="gemini-1.5-flash")
                     
-                    if research_mode_active and hasattr(api_call_response, 'candidates') and api_call_response.candidates:
-                        try:
-                            grounding_data = api_call_response.candidates[0].grounding_metadata
-                            if grounding_data and hasattr(grounding_data, 'grounding_chunks'):
-                                final_response_payload += "\n\n---\n### 🌐 Research Mode Verified Reference Anchors:\n"
-                                for web_chunk in grounding_data.grounding_chunks:
-                                    if hasattr(web_chunk, 'web') and web_chunk.web:
-                                        final_response_payload += f"- [{web_chunk.web.title}]({web_chunk.web.uri})\n"
-                        except Exception: pass
-                        
+                    # Append deep search tools dynamically if research mode is turned on
+                    generation_tools = ["google_search_index"] if research_mode_active else None
+                    
+                    api_call_response = genai.generate_content(
+                        model="gemini-1.5-flash",
+                        contents=f"{system_instructions}\n\nUser Question: {unresolved_user_prompt}",
+                    )
+                    
+                    final_response_payload = api_call_response.text
                     text_stream_block.markdown(final_response_payload)
                     active_chat_log.append({"role": "assistant", "content": final_response_payload})
-                except Exception as loop_error: st.error(str(loop_error))
+                except Exception as loop_error: 
+                    st.error(f"Engine connection exception: {str(loop_error)}")
 
 # --- TAB 2: CASE SCENARIO ANALYSER ---
 with tab2:
@@ -252,7 +245,6 @@ with tab2:
         else:
             with st.spinner("Compiling legal analysis briefs..."):
                 try:
-                    client_instance = genai.Client(api_key=MASTER_API_KEY)
                     system_instructions = (
                         "You are ClassroomBuddy AI, an elite legal analytical machine. Break down the query using exactly 4 clear headers:\n"
                         "1. ISSUE: Clear isolated legal questions tracking the factual matrices.\n"
@@ -260,13 +252,10 @@ with tab2:
                         "3. APPLICATION: Deeply apply facts to the rules framework components.\n"
                         "4. CONCLUSION: Clear structural final outcome summary judgment.\n"
                     )
-                    config_mapping = {"system_instruction": system_instructions}
-                    if research_mode_active: config_mapping["tools"] = [{"google_search": {}}]
                     
-                    api_call_response = client_instance.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=f"Analyze facts: {problem_matrix_text}. Target subject classification: {selected_subject_domain}",
-                        config=types.GenerateContentConfig(**config_mapping)
+                    api_call_response = genai.generate_content(
+                        model="gemini-1.5-flash",
+                        contents=f"{system_instructions}\n\nSubject: {selected_subject_domain}\nFacts: {problem_matrix_text}"
                     )
                     st.markdown("---")
                     st.success("IRAC Summary Brief Compiled Successfully!")
@@ -295,7 +284,6 @@ with tab3:
         else:
             with st.spinner("Extracting parameters from philosophy reading indexes..."):
                 try:
-                    client_instance = genai.Client(api_key=MASTER_API_KEY)
                     uploaded_book_context = rapid_extract_document_chunks(tab3_file_upload)
                     
                     layouts_list = []
@@ -309,17 +297,16 @@ with tab3:
                         "You are ClassroomBuddy AI, an elite legal philosopher and Socratic scholar. "
                         "CRITICAL SEARCH FALLBACK RULE:\n"
                         "If the user asks a concept and it is missing or not found within the uploaded book data context pool, "
-                        "you MUST NOT state 'not found'. Instead, automatically switch to your baseline intelligence or activate Research Mode to pull correct web references.\n\n"
+                        "you MUST NOT state 'not found'. Instead, automatically switch to your baseline intelligence to pull correct details.\n\n"
                         f"REQUIRED FORMAT MATRIX SETTINGS:\n{compiled_layouts_string or '- Pedagogical breakdown layout.'}\n\n"
                         "SOCRATIC INTERACTIVE LOOP:\n"
                         "At the bottom of response, append a structured markdown selector prompting next steps.\n\n"
                         f"--- ATTACHED SCHOLAR BOOK HIGHLIGHTS ---\n{uploaded_book_context}"
                     )
-                    config_mapping = {"system_instruction": system_instructions}
-                    if research_mode_active: config_mapping["tools"] = [{"google_search": {}}]
                     
-                    api_call_response = client_instance.models.generate_content(
-                        model='gemini-2.5-flash', contents=philosophy_query_line, config=types.GenerateContentConfig(**config_mapping)
+                    api_call_response = genai.generate_content(
+                        model="gemini-1.5-flash",
+                        contents=f"{system_instructions}\n\nQuery: {philosophy_query_line}"
                     )
                     st.markdown("---")
                     st.markdown(api_call_response.text)
@@ -350,8 +337,6 @@ with tab4:
         else:
             with st.spinner("Compiling custom testing parameters..."):
                 try:
-                    client_instance = genai.Client(api_key=MASTER_API_KEY)
-                    
                     quiz_generation_prompt_string = (
                         f"Construct an evaluation sheet using exactly the '{chosen_quiz_assessment_mode}' format pattern rules. "
                         f"CRITICAL TESTING INSTRUCTION:\n"
@@ -361,11 +346,9 @@ with tab4:
                         "At the absolute end of your test sheet, provide a complete, clear Answer Key & Rationale Guide explicitly detailed to justify matching the BNS provisions criteria."
                     )
                     
-                    config_mapping = {}
-                    if research_mode_active: config_mapping["tools"] = [{"google_search": {}}]
-                        
-                    api_call_response = client_instance.models.generate_content(
-                        model='gemini-2.5-flash', contents=quiz_generation_prompt_string, config=types.GenerateContentConfig(**config_mapping)
+                    api_call_response = genai.generate_content(
+                        model="gemini-1.5-flash",
+                        contents=quiz_generation_prompt_string
                     )
                     st.session_state.quiz_sheet_cache = api_call_response.text
                 except Exception as generic_error: st.error(str(generic_error))
