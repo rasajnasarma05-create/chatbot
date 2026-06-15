@@ -44,9 +44,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Securely bind the master key from Streamlit Secrets
+# Securely bind the master key from Streamlit Secrets with strict character stripping
 try:
-    MASTER_API_KEY = st.secrets["GEMINI_MASTER_KEY"].strip().replace('"', '')
+    MASTER_API_KEY = str(st.secrets["GEMINI_MASTER_KEY"]).strip().replace('"', '').replace("'", "")
 except Exception:
     MASTER_API_KEY = ""
 
@@ -138,7 +138,7 @@ with st.sidebar:
     st.markdown("---")
     st.subheader("Peer Suggestion Box")
     anonymous_suggestion = st.text_area("Share bugs or recommendations anonymously:", placeholder="Type entry detail here...")
-    if f_btn := st.button("Submit Comment"):
+    if st.button("Submit Comment"):
         if anonymous_suggestion:
             os.makedirs("data", exist_ok=True)
             with open(FEEDBACK_LOG_PATH, "a") as file_handle:
@@ -225,7 +225,6 @@ with tab1:
                     
                     final_response_payload = api_call_response.text
                     
-                    # Footnote references generator block
                     if research_mode_active and hasattr(api_call_response, 'candidates') and api_call_response.candidates:
                         try:
                             grounding_data = api_call_response.candidates[0].grounding_metadata
