@@ -1,5 +1,6 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import os
 from pypdf import PdfReader
 
@@ -46,8 +47,6 @@ st.markdown("""
 # Securely bind the master key from Streamlit Secrets
 try:
     MASTER_API_KEY = st.secrets["GEMINI_MASTER_KEY"].strip().replace('"', '')
-    if MASTER_API_KEY:
-        genai.configure(api_key=MASTER_API_KEY)
 except Exception:
     MASTER_API_KEY = ""
 
@@ -139,7 +138,7 @@ with st.sidebar:
     st.markdown("---")
     st.subheader("Peer Suggestion Box")
     anonymous_suggestion = st.text_area("Share bugs or recommendations anonymously:", placeholder="Type entry detail here...")
-    if st.button("Submit Comment"):
+    if f_btn := st.button("Submit Comment"):
         if anonymous_suggestion:
             os.makedirs("data", exist_ok=True)
             with open(FEEDBACK_LOG_PATH, "a") as file_handle:
@@ -203,6 +202,7 @@ with tab1:
             with st.chat_message("assistant"):
                 text_stream_block = st.empty()
                 try:
+                    client = genai.Client(api_key=MASTER_API_KEY)
                     file_context_string = rapid_extract_document_chunks(tab1_file_upload)
                     
                     system_instructions = (
@@ -213,18 +213,29 @@ with tab1:
                         f"--- LOCAL SOURCE FILE DATA BLOCK ---\n{file_context_string}"
                     )
                     
-                    # Native high-compatibility generation mapping
-                    model_engine = genai.Model(model_id="gemini-1.5-flash")
-                    
-                    # Append deep search tools dynamically if research mode is turned on
-                    generation_tools = ["google_search_index"] if research_mode_active else None
-                    
-                    api_call_response = genai.generate_content(
-                        model="gemini-1.5-flash",
-                        contents=f"{system_instructions}\n\nUser Question: {unresolved_user_prompt}",
+                    config = {"system_instruction": system_instructions}
+                    if research_mode_active: 
+                        config["tools"] = [{"google_search": {}}]
+                        
+                    api_call_response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=unresolved_user_prompt,
+                        config=types.GenerateContentConfig(**config)
                     )
                     
                     final_response_payload = api_call_response.text
+                    
+                    # Footnote references generator block
+                    if research_mode_active and hasattr(api_call_response, 'candidates') and api_call_response.candidates:
+                        try:
+                            grounding_data = api_call_response.candidates[0].grounding_metadata
+                            if grounding_data and hasattr(grounding_data, 'grounding_chunks'):
+                                final_response_payload += "\n\n---\n### 🌐 Research Mode Verified Reference Anchors:\n"
+                                for web_chunk in grounding_data.grounding_chunks:
+                                    if hasattr(web_chunk, 'web') and web_chunk.web:
+                                        final_response_payload += f"- [{web_chunk.web.title}]({web_chunk.web.uri})\n"
+                        except Exception: pass
+                        
                     text_stream_block.markdown(final_response_payload)
                     active_chat_log.append({"role": "assistant", "content": final_response_payload})
                 except Exception as loop_error: 
@@ -245,6 +256,7 @@ with tab2:
         else:
             with st.spinner("Compiling legal analysis briefs..."):
                 try:
+                    client = genai.Client(api_key=MASTER_API_KEY)
                     system_instructions = (
                         "You are ClassroomBuddy AI, an elite legal analytical machine. Break down the query using exactly 4 clear headers:\n"
                         "1. ISSUE: Clear isolated legal questions tracking the factual matrices.\n"
@@ -253,9 +265,14 @@ with tab2:
                         "4. CONCLUSION: Clear structural final outcome summary judgment.\n"
                     )
                     
-                    api_call_response = genai.generate_content(
-                        model="gemini-1.5-flash",
-                        contents=f"{system_instructions}\n\nSubject: {selected_subject_domain}\nFacts: {problem_matrix_text}"
+                    config = {"system_instruction": system_instructions}
+                    if research_mode_active: 
+                        config["tools"] = [{"google_search": {}}]
+                        
+                    api_call_response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=f"Subject: {selected_subject_domain}\nFacts: {problem_matrix_text}",
+                        config=types.GenerateContentConfig(**config)
                     )
                     st.markdown("---")
                     st.success("IRAC Summary Brief Compiled Successfully!")
@@ -284,6 +301,7 @@ with tab3:
         else:
             with st.spinner("Extracting parameters from philosophy reading indexes..."):
                 try:
+                    client = genai.Client(api_key=MASTER_API_KEY)
                     uploaded_book_context = rapid_extract_document_chunks(tab3_file_upload)
                     
                     layouts_list = []
@@ -304,9 +322,14 @@ with tab3:
                         f"--- ATTACHED SCHOLAR BOOK HIGHLIGHTS ---\n{uploaded_book_context}"
                     )
                     
-                    api_call_response = genai.generate_content(
-                        model="gemini-1.5-flash",
-                        contents=f"{system_instructions}\n\nQuery: {philosophy_query_line}"
+                    config = {"system_instruction": system_instructions}
+                    if research_mode_active: 
+                        config["tools"] = [{"google_search": {}}]
+                        
+                    api_call_response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=philosophy_query_line,
+                        config=types.GenerateContentConfig(**config)
                     )
                     st.markdown("---")
                     st.markdown(api_call_response.text)
@@ -337,6 +360,7 @@ with tab4:
         else:
             with st.spinner("Compiling custom testing parameters..."):
                 try:
+                    client = genai.Client(api_key=MASTER_API_KEY)
                     quiz_generation_prompt_string = (
                         f"Construct an evaluation sheet using exactly the '{chosen_quiz_assessment_mode}' format pattern rules. "
                         f"CRITICAL TESTING INSTRUCTION:\n"
@@ -346,8 +370,8 @@ with tab4:
                         "At the absolute end of your test sheet, provide a complete, clear Answer Key & Rationale Guide explicitly detailed to justify matching the BNS provisions criteria."
                     )
                     
-                    api_call_response = genai.generate_content(
-                        model="gemini-1.5-flash",
+                    api_call_response = client.models.generate_content(
+                        model='gemini-2.5-flash',
                         contents=quiz_generation_prompt_string
                     )
                     st.session_state.quiz_sheet_cache = api_call_response.text
