@@ -4,7 +4,9 @@ from google.genai import types
 import os
 from pypdf import PdfReader
 
-# 1. PREMIUM VISUAL CONFIGURATION
+# ==========================================
+# 1. PREMIUM LAW SCHOOL VISUAL THEMING
+# ==========================================
 st.set_page_config(page_title="ClassroomBuddy AI", page_icon="🎓", layout="wide")
 
 st.markdown("""
@@ -27,7 +29,9 @@ try:
 except Exception:
     MASTER_API_KEY = ""
 
-# 2. PERSISTENT REGISTRY USER BASE
+# ==========================================
+# 2. PERSISTENT INSTITUTIONAL REGISTRY GATE
+# ==========================================
 @st.cache_resource
 def get_persistent_user_database():
     return {
@@ -97,7 +101,6 @@ with tab1:
             with st.chat_message("assistant"):
                 text_stream_block = st.empty()
                 try:
-                    # Clean modern SDK client initiation instantiation block
                     client = genai.Client(api_key=MASTER_API_KEY)
                     
                     system_instructions = (
